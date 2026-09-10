@@ -1,68 +1,76 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/bonsai_telemetry.dart';
+import '../services/firebase_service.dart';
 
 class TelemetryNotifier extends StateNotifier<BonsaiTelemetry> {
-  Timer? _timer;
-
-  TelemetryNotifier()
-      : super(BonsaiTelemetry(
-          temperature: 24.2,
-          humidity: 62.0,
-          soilMoisture: 28.5,
-          light: 68.0,
-          pump: false,
-          autoMode: false,
-          plantHealth: 92,
-          lastWatered: 'Today, 08:30 AM',
-          lastUpdated: DateTime.now().toIso8601String(),
-        )) {
-    _startSimulatedStream();
+  TelemetryNotifier() : super(BonsaiTelemetry.initial()) {
+    _connect();
   }
 
-  void _startSimulatedStream() {
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      double newMoisture = state.soilMoisture;
-      bool newPump = state.pump;
+  StreamSubscription? _telemetrySub;
+  Timer? _staleWatchdog;
 
-      if (newPump) {
-        newMoisture = (newMoisture + 1.8).clamp(0.0, 100.0);
+  Future<void> _connect() async {
+    try {
+      await FirebaseService.instance.ensureSignedIn();
+    } catch (e) {
+      // Sign-in failed (bad credentials, no network, Auth not enabled
+      // yet, etc.) — keep showing "offline" instead of crashing.
+      state = state.copyWith(deviceConnected: false);
+    }
 
-        if (state.autoMode && newMoisture >= 70.0) {
-          newPump = false;
-        }
-      } else {
-        newMoisture = (newMoisture - 0.04).clamp(10.0, 100.0);
+    _telemetrySub = FirebaseService.instance.telemetryStream().listen(
+      (data) {
+        if (data.isEmpty) return;
+        state = BonsaiTelemetry.fromMap(data, previous: state);
+      },
+      onError: (_) => state = state.copyWith(deviceConnected: false),
+    );
 
-        if (state.autoMode && newMoisture < 30.0) {
-          newPump = true;
-        }
+    // The ESP32 writes to Firebase roughly every ~3s (see SETUP_GUIDE.md).
+    // If nothing has arrived in 15s, treat the device as offline — same
+    // threshold the website uses (src/context/AppContext.tsx).
+    _staleWatchdog = Timer.periodic(const Duration(seconds: 5), (_) {
+      final secondsSinceUpdate =
+          DateTime.now().difference(state.lastUpdated).inSeconds;
+      if (secondsSinceUpdate > 15 && state.deviceConnected) {
+        state = state.copyWith(deviceConnected: false);
       }
-
-      state = state.copyWith(
-        soilMoisture: double.parse(newMoisture.toStringAsFixed(1)),
-        pump: newPump,
-        lastUpdated: DateTime.now().toIso8601String(),
-      );
     });
   }
 
+  /// Sends a manual pump on/off command. Optimistically updates local
+  /// state; the ESP32's next telemetry write confirms (or corrects) it,
+  /// and any other device watching bonsai/telemetry updates too.
   void togglePump([bool? value]) {
-    if (state.autoMode) return;
     final next = value ?? !state.pump;
-    state = state.copyWith(
-      pump: next,
-      lastWatered: next ? 'Just now' : state.lastWatered,
+    state = state.copyWith(pump: next);
+    FirebaseService.instance.sendControlCommand({'pump': next}).catchError(
+      (Object err) {
+        // Revert the optimistic update if the write failed.
+        state = state.copyWith(pump: !next);
+      },
     );
   }
 
   void toggleAutoMode([bool? value]) {
-    state = state.copyWith(autoMode: value ?? !state.autoMode);
+    final next = value ?? !state.autoMode;
+    state = state.copyWith(autoMode: next);
+    FirebaseService.instance
+        .sendControlCommand({'autoMode': next}).catchError((Object err) {
+      state = state.copyWith(autoMode: !next);
+    });
+  }
+
+  void rebootDevice() {
+    FirebaseService.instance.sendControlCommand({'reboot': true});
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    _telemetrySub?.cancel();
+    _staleWatchdog?.cancel();
     super.dispose();
   }
 }

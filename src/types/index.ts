@@ -11,7 +11,6 @@ export interface BonsaiTelemetry {
   deviceConnected: boolean;
   rssi: number;
   batteryLevel: number;
-
   soilFault?: boolean;
   lightFault?: boolean;
   dhtFault?: boolean;
@@ -25,10 +24,10 @@ export interface HealthAnalysis {
   badgeColor: string;
   recommendations: string[];
   factors: {
-    moisture: { status: string; score: number };
-    temperature: { status: string; score: number };
-    humidity: { status: string; score: number };
-    light: { status: string; score: number };
+    moisture: { status: string; score: number | null };
+    temperature: { status: string; score: number | null };
+    humidity: { status: string; score: number | null };
+    light: { status: string; score: number | null };
   };
 }
 

@@ -25,6 +25,7 @@ const DEVICE_PASSWORD = '88888888';
 
 export const TELEMETRY_PATH = 'bonsai/telemetry';
 export const CONTROL_PATH = 'bonsai/control';
+export const PROFILE_PATH = 'bonsai/profile';
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
@@ -75,10 +76,62 @@ export function subscribeTelemetry(
   return unsubscribe;
 }
 
+export function subscribeControl(
+  onData: (data: Record<string, any>) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const { db } = init();
+  const controlRef = ref(db, CONTROL_PATH);
+
+  const unsubscribe = onValue(
+    controlRef,
+    (snapshot: DataSnapshot) => {
+      const val = snapshot.val();
+      if (val) onData(val);
+    },
+    (error) => {
+      console.error('Firebase control subscription error:', error);
+      onError?.(error as unknown as Error);
+    }
+  );
+
+  return unsubscribe;
+}
+
+export function subscribeProfile(
+  onData: (data: Record<string, any>) => void,
+  onError?: (err: Error) => void
+): () => void {
+  const { db } = init();
+  const profileRef = ref(db, PROFILE_PATH);
+
+  const unsubscribe = onValue(
+    profileRef,
+    (snapshot: DataSnapshot) => {
+      const val = snapshot.val();
+      if (val) onData(val);
+    },
+    (error) => {
+      console.error('Firebase profile subscription error:', error);
+      onError?.(error as unknown as Error);
+    }
+  );
+
+  return unsubscribe;
+}
+
 export async function sendControlCommand(
   partial: Record<string, any>
 ): Promise<void> {
   const { db } = init();
   await ensureSignedIn();
   await update(ref(db, CONTROL_PATH), partial);
+}
+
+export async function saveProfile(
+  partial: Record<string, any>
+): Promise<void> {
+  const { db } = init();
+  await ensureSignedIn();
+  await update(ref(db, PROFILE_PATH), partial);
 }

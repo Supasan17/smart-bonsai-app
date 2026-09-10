@@ -84,9 +84,11 @@ export const PlantHealthCard: React.FC = () => {
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
                 <Droplets className="w-3.5 h-3.5 text-cyan-500" /> {t('plantHealth.moisture')}
               </span>
-              <span className="font-bold text-slate-900 dark:text-white">{telemetry.soilMoisture}%</span>
+              <span className="font-bold text-slate-900 dark:text-white">
+                {telemetry.soilFault ? 'No data' : `${telemetry.soilMoisture}%`}
+              </span>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-500">
+            <span className={`text-[11px] font-semibold ${telemetry.soilFault ? 'text-slate-400' : 'text-emerald-500'}`}>
               {health.factors.moisture.status}
             </span>
           </div>
@@ -96,9 +98,11 @@ export const PlantHealthCard: React.FC = () => {
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
                 <Thermometer className="w-3.5 h-3.5 text-amber-500" /> {t('plantHealth.temperature')}
               </span>
-              <span className="font-bold text-slate-900 dark:text-white">{formatTemp(telemetry.temperature, settings.tempUnit)}</span>
+              <span className="font-bold text-slate-900 dark:text-white">
+                {telemetry.dhtFault ? 'No data' : formatTemp(telemetry.temperature, settings.tempUnit)}
+              </span>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-500">
+            <span className={`text-[11px] font-semibold ${telemetry.dhtFault ? 'text-slate-400' : 'text-emerald-500'}`}>
               {health.factors.temperature.status}
             </span>
           </div>
@@ -108,9 +112,11 @@ export const PlantHealthCard: React.FC = () => {
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
                 <Wind className="w-3.5 h-3.5 text-blue-400" /> {t('plantHealth.humidity')}
               </span>
-              <span className="font-bold text-slate-900 dark:text-white">{telemetry.humidity}%</span>
+              <span className="font-bold text-slate-900 dark:text-white">
+                {telemetry.dhtFault ? 'No data' : `${telemetry.humidity}%`}
+              </span>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-500">
+            <span className={`text-[11px] font-semibold ${telemetry.dhtFault ? 'text-slate-400' : 'text-emerald-500'}`}>
               {health.factors.humidity.status}
             </span>
           </div>
@@ -120,9 +126,11 @@ export const PlantHealthCard: React.FC = () => {
               <span className="text-slate-500 dark:text-slate-400 flex items-center gap-1">
                 <Sun className="w-3.5 h-3.5 text-yellow-400" /> {t('plantHealth.light')}
               </span>
-              <span className="font-bold text-slate-900 dark:text-white">{telemetry.light}%</span>
+              <span className="font-bold text-slate-900 dark:text-white">
+                {telemetry.lightFault ? 'No data' : `${telemetry.light}%`}
+              </span>
             </div>
-            <span className="text-[11px] font-semibold text-emerald-500">
+            <span className={`text-[11px] font-semibold ${telemetry.lightFault ? 'text-slate-400' : 'text-emerald-500'}`}>
               {health.factors.light.status}
             </span>
           </div>

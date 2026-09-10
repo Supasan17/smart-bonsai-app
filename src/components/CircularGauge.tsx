@@ -74,7 +74,6 @@ export const CircularGauge: React.FC<CircularGaugeProps> = ({
       transition={{ duration: 0.2 }}
       className={`relative p-5 rounded-3xl bg-white/80 dark:bg-[#12231E]/80 backdrop-blur-xl border border-white/40 dark:border-emerald-500/20 shadow-xl ${glowClass} overflow-hidden group ${offline ? 'grayscale opacity-60' : ''}`}
     >
-
       <div
         className="absolute -top-12 -right-12 w-28 h-28 rounded-full blur-2xl opacity-20 pointer-events-none transition-all duration-500 group-hover:opacity-40"
         style={{ backgroundColor: statusColor }}
@@ -105,9 +104,7 @@ export const CircularGauge: React.FC<CircularGaugeProps> = ({
       </div>
 
       <div className="relative flex items-center justify-center my-3">
-
         <svg className="w-32 h-32 transform -rotate-90">
-
           <circle
             cx="64"
             cy="64"
@@ -116,7 +113,6 @@ export const CircularGauge: React.FC<CircularGaugeProps> = ({
             strokeWidth="10"
             fill="transparent"
           />
-
           <motion.circle
             cx="64"
             cy="64"

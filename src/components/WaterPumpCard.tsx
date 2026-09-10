@@ -9,13 +9,13 @@ import {
   History,
   Clock,
   Sparkles,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 
 export const WaterPumpCard: React.FC = () => {
   const {
     telemetry,
-    settings,
     togglePump,
     toggleAutoMode,
     triggerManualWater,
@@ -38,7 +38,6 @@ export const WaterPumpCard: React.FC = () => {
             exit={{ opacity: 0 }}
             className="absolute inset-0 pointer-events-none z-0 overflow-hidden"
           >
-
             <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 via-cyan-500/15 to-emerald-500/10 animate-pulse" />
 
             {[...Array(12)].map((_, i) => (
@@ -117,11 +116,8 @@ export const WaterPumpCard: React.FC = () => {
             <motion.button
               whileTap={{ scale: 0.92 }}
               onClick={() => togglePump()}
-              disabled={isAutoMode}
               className={`relative w-24 h-24 rounded-full flex items-center justify-center transition-all duration-300 shadow-2xl ${
-                isAutoMode
-                  ? 'bg-slate-200 dark:bg-emerald-950 text-slate-400 border border-slate-300 dark:border-emerald-500/30 cursor-not-allowed opacity-60'
-                  : isPumpActive
+                isPumpActive
                   ? 'bg-gradient-to-tr from-cyan-500 to-emerald-400 text-white shadow-glow-emerald ring-4 ring-cyan-400/40'
                   : 'bg-slate-200 dark:bg-emerald-950 text-slate-400 border border-slate-300 dark:border-emerald-500/30 hover:border-emerald-500/50'
               }`}
@@ -171,9 +167,9 @@ export const WaterPumpCard: React.FC = () => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => triggerManualWater(10)}
-              disabled={isPumpActive || isAutoMode}
+              disabled={isPumpActive}
               className={`w-full py-3.5 px-4 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg transition-all ${
-                isPumpActive || isAutoMode
+                isPumpActive
                   ? 'bg-slate-300 dark:bg-slate-800 text-slate-500 cursor-not-allowed'
                   : 'bg-gradient-to-r from-emerald-600 to-teal-500 hover:from-emerald-500 hover:to-teal-400 text-white shadow-emerald-600/30'
               }`}
@@ -188,7 +184,7 @@ export const WaterPumpCard: React.FC = () => {
           <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
           <span>
             {isAutoMode
-              ? `Auto-watering is active. System will start the pump automatically if soil moisture drops below ${settings.autoWaterMinMoisture}%, and stop once it reaches ${settings.autoWaterTargetMoisture}%.`
+              ? `Auto-watering is active. System will start pump automatically if Soil Moisture drops below ${telemetry.soilMoisture < 30 ? '30%' : 'configured threshold'}.`
               : 'Auto-watering is disabled. Manual override control enabled.'}
           </span>
         </div>

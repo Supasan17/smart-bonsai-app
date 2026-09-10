@@ -44,7 +44,6 @@ export const Navbar: React.FC = () => {
                   : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
               }`}
             >
-
               {isActive && (
                 <div className="absolute inset-0 rounded-full bg-emerald-500/10 dark:bg-emerald-500/20 border border-emerald-500/30 -z-10 animate-fade-in" />
               )}

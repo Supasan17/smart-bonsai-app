@@ -147,14 +147,7 @@ void setPump(bool on) {
 
 void pollControlNode() {
   if (Firebase.RTDB.getBool(&fbdo, CONTROL_PATH "/autoMode")) {
-    bool newAutoMode = fbdo.boolData();
-    if (newAutoMode != autoMode) {
-      autoMode = newAutoMode;
-      if (!autoMode && pumpOn) {
-        setPump(false);
-        Serial.println("Auto Mode turned OFF from app -> pump forced OFF");
-      }
-    }
+    autoMode = fbdo.boolData();
   }
 
   if (Firebase.RTDB.getFloat(&fbdo, CONTROL_PATH "/autoWaterMinMoisture")) {
@@ -168,7 +161,10 @@ void pollControlNode() {
   if (!autoMode) {
     if (Firebase.RTDB.getBool(&fbdo, CONTROL_PATH "/pump")) {
       bool requested = fbdo.boolData();
-      if (requested != pumpOn) setPump(requested);
+      if (requested != pumpOn) {
+        setPump(requested);
+        Serial.printf("Manual pump command received from app: %s\n", requested ? "ON" : "OFF");
+      }
     }
   }
 
@@ -224,12 +220,13 @@ bool readDHT22(float &tempOut, float &humOut) {
     h < DHT_HUMIDITY_MIN || h > DHT_HUMIDITY_MAX
   );
 
-  if (!notNumber && !outOfRange) {
-    tempOut = t;
-    humOut = h;
-    return true;
+  if (notNumber || outOfRange) {
+    return false;
   }
-  return false;
+
+  tempOut = t;
+  humOut = h;
+  return true;
 }
 
 void readSensorsAndPublish() {
@@ -316,6 +313,7 @@ void readSensorsAndPublish() {
   json.set("soilMoisture", soilMoisture);
   json.set("light", light);
   json.set("pump", pumpOn);
+  json.set("autoMode", autoMode);
   json.set("rssi", WiFi.RSSI());
   json.set("batteryLevel", batteryLevel);
   json.set("soilFault", soilFaulted);

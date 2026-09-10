@@ -13,16 +13,21 @@ class DashboardScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Column(
+        title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
+            const Text(
               'Smart Bonsai',
-              style: TextStyle(fontWeight: FontWeight.extrabold),
+              style: TextStyle(fontWeight: FontWeight.bold),
             ),
             Text(
-              'Japanese Black Pine • ESP32 Online',
-              style: TextStyle(fontSize: 11, color: Colors.emerald),
+              telemetry.deviceConnected
+                  ? 'ESP32 Online'
+                  : 'ESP32 Offline — check power/Wi-Fi',
+              style: TextStyle(
+                fontSize: 11,
+                color: telemetry.deviceConnected ? Colors.green : Colors.redAccent,
+              ),
             )
           ],
         ),
@@ -38,7 +43,7 @@ class DashboardScreen extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
+            // Hero Plant Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -69,9 +74,9 @@ class DashboardScreen extends ConsumerWidget {
                             color: Colors.white24,
                             borderRadius: BorderRadius.circular(12),
                           ),
-                          child: const Text(
-                            'ONLINE • 1s STREAM',
-                            style: TextStyle(
+                          child: Text(
+                            telemetry.deviceConnected ? 'LIVE STREAM' : 'NO SIGNAL',
+                            style: const TextStyle(
                               color: Colors.white,
                               fontSize: 10,
                               fontWeight: FontWeight.bold,
@@ -88,9 +93,9 @@ class DashboardScreen extends ConsumerWidget {
                           ),
                         ),
                         const SizedBox(height: 4),
-                        const Text(
-                          'Automatic Micro-Irrigation & Climate Engine',
-                          style: TextStyle(
+                        Text(
+                          'Signal: ${telemetry.rssi} dBm  •  Battery: ${telemetry.batteryLevel}%',
+                          style: const TextStyle(
                             color: Colors.white70,
                             fontSize: 12,
                           ),
@@ -110,6 +115,7 @@ class DashboardScreen extends ConsumerWidget {
             ),
             const SizedBox(height: 12),
 
+            // 4 Circular Gauges Grid
             GridView.count(
               crossAxisCount: 2,
               shrinkWrap: true,
@@ -124,7 +130,9 @@ class DashboardScreen extends ConsumerWidget {
                   unit: '%',
                   icon: Icons.water_drop,
                   color: telemetry.soilMoisture < 30.0 ? Colors.orange : Colors.cyan,
-                  status: telemetry.soilMoisture < 30.0 ? 'Dry' : 'Optimal',
+                  status: telemetry.soilFault
+                      ? 'Fault'
+                      : (telemetry.soilMoisture < 30.0 ? 'Dry' : 'Optimal'),
                 ),
                 CircularGaugeWidget(
                   label: 'Temperature',
@@ -132,7 +140,7 @@ class DashboardScreen extends ConsumerWidget {
                   unit: '°C',
                   icon: Icons.thermostat,
                   color: Colors.amber,
-                  status: 'Normal',
+                  status: telemetry.dhtFault ? 'Fault' : 'Normal',
                 ),
                 CircularGaugeWidget(
                   label: 'Air Humidity',
@@ -140,7 +148,7 @@ class DashboardScreen extends ConsumerWidget {
                   unit: '%',
                   icon: Icons.air,
                   color: Colors.blue,
-                  status: 'Optimal',
+                  status: telemetry.dhtFault ? 'Fault' : 'Optimal',
                 ),
                 CircularGaugeWidget(
                   label: 'Light Intensity',
@@ -148,12 +156,13 @@ class DashboardScreen extends ConsumerWidget {
                   unit: '%',
                   icon: Icons.wb_sunny,
                   color: Colors.yellow,
-                  status: 'Daylight',
+                  status: telemetry.lightFault ? 'Fault' : 'Daylight',
                 ),
               ],
             ),
             const SizedBox(height: 24),
 
+            // Pump Control Card
             Container(
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
@@ -175,12 +184,21 @@ class DashboardScreen extends ConsumerWidget {
                             color: telemetry.pump ? Colors.cyan : Colors.grey,
                           ),
                           const SizedBox(width: 8),
-                          const Text(
-                            'Water Pump System',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
+                          const Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Water Pump System',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              Text(
+                                'Auto Mode',
+                                style: TextStyle(fontSize: 11, color: Colors.grey),
+                              ),
+                            ],
                           ),
                         ],
                       ),
@@ -200,13 +218,21 @@ class DashboardScreen extends ConsumerWidget {
                         borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    onPressed: () => notifier.togglePump(),
+                    onPressed: telemetry.autoMode ? null : () => notifier.togglePump(),
                     icon: Icon(telemetry.pump ? Icons.power_settings_new : Icons.play_arrow),
                     label: Text(
                       telemetry.pump ? 'STOP PUMP' : 'MANUAL WATER NOW',
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                  )
+                  ),
+                  if (telemetry.autoMode)
+                    const Padding(
+                      padding: EdgeInsets.only(top: 8),
+                      child: Text(
+                        'Turn off Auto Mode to water manually.',
+                        style: TextStyle(fontSize: 11, color: Colors.grey),
+                      ),
+                    ),
                 ],
               ),
             ),

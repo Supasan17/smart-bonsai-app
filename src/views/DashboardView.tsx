@@ -26,7 +26,6 @@ export const DashboardView: React.FC = () => {
 
   return (
     <div className="space-y-6 pb-24">
-
       <Header />
 
       {isOffline && (

@@ -2,11 +2,14 @@ import { BonsaiTelemetry, HealthAnalysis, HealthStatusLevel } from '../types';
 import { formatTemp, TempUnit } from '../utils/temperature';
 
 export function calculatePlantHealth(telemetry: BonsaiTelemetry, tempUnit: TempUnit = 'C'): HealthAnalysis {
-  const { soilMoisture, temperature, humidity, light } = telemetry;
+  const { soilMoisture, temperature, humidity, light, soilFault, dhtFault, lightFault } = telemetry;
 
-  let moistureScore = 100;
+  let moistureScore: number | null = 100;
   let moistureStatus = 'Optimal';
-  if (soilMoisture < 20) {
+  if (soilFault) {
+    moistureScore = null;
+    moistureStatus = 'Sensor Offline';
+  } else if (soilMoisture < 20) {
     moistureScore = 20;
     moistureStatus = 'Critically Low';
   } else if (soilMoisture < 35) {
@@ -17,9 +20,12 @@ export function calculatePlantHealth(telemetry: BonsaiTelemetry, tempUnit: TempU
     moistureStatus = 'Overwatered';
   }
 
-  let tempScore = 100;
+  let tempScore: number | null = 100;
   let tempStatus = 'Optimal';
-  if (temperature < 12) {
+  if (dhtFault) {
+    tempScore = null;
+    tempStatus = 'Sensor Offline';
+  } else if (temperature < 12) {
     tempScore = 30;
     tempStatus = 'Too Cold';
   } else if (temperature < 18) {
@@ -33,9 +39,12 @@ export function calculatePlantHealth(telemetry: BonsaiTelemetry, tempUnit: TempU
     tempStatus = 'Warm';
   }
 
-  let humidityScore = 100;
+  let humidityScore: number | null = 100;
   let humidityStatus = 'Optimal';
-  if (humidity < 30) {
+  if (dhtFault) {
+    humidityScore = null;
+    humidityStatus = 'Sensor Offline';
+  } else if (humidity < 30) {
     humidityScore = 40;
     humidityStatus = 'Very Dry Air';
   } else if (humidity < 50) {
@@ -46,9 +55,12 @@ export function calculatePlantHealth(telemetry: BonsaiTelemetry, tempUnit: TempU
     humidityStatus = 'High Humidity';
   }
 
-  let lightScore = 100;
+  let lightScore: number | null = 100;
   let lightStatus = 'Optimal';
-  if (light < 25) {
+  if (lightFault) {
+    lightScore = null;
+    lightStatus = 'Sensor Offline';
+  } else if (light < 25) {
     lightScore = 30;
     lightStatus = 'Insufficient Light';
   } else if (light < 50) {
@@ -59,12 +71,17 @@ export function calculatePlantHealth(telemetry: BonsaiTelemetry, tempUnit: TempU
     lightStatus = 'Intense Direct Light';
   }
 
-  const totalScore = Math.round(
-    moistureScore * 0.35 +
-    tempScore * 0.25 +
-    humidityScore * 0.20 +
-    lightScore * 0.20
-  );
+  const weighted: Array<{ score: number | null; weight: number }> = [
+    { score: moistureScore, weight: 0.35 },
+    { score: tempScore, weight: 0.25 },
+    { score: humidityScore, weight: 0.20 },
+    { score: lightScore, weight: 0.20 },
+  ];
+  const available = weighted.filter((f) => f.score !== null) as Array<{ score: number; weight: number }>;
+  const availableWeight = available.reduce((sum, f) => sum + f.weight, 0);
+  const totalScore = availableWeight > 0
+    ? Math.round(available.reduce((sum, f) => sum + f.score * f.weight, 0) / availableWeight)
+    : 0;
 
   let status: HealthStatusLevel = 'Excellent';
   let badgeColor = '#10B981';
@@ -82,27 +99,37 @@ export function calculatePlantHealth(telemetry: BonsaiTelemetry, tempUnit: TempU
 
   const recommendations: string[] = [];
 
-  if (soilMoisture < 30) {
-    recommendations.push(`Water the plant now! Soil moisture is low (${soilMoisture}%).`);
-  } else if (soilMoisture > 80) {
-    recommendations.push(`Soil is saturated (${soilMoisture}%). Pause watering to prevent root rot.`);
+  if (!soilFault) {
+    if (soilMoisture < 30) {
+      recommendations.push(`Water the plant now! Soil moisture is low (${soilMoisture}%).`);
+    } else if (soilMoisture > 80) {
+      recommendations.push(`Soil is saturated (${soilMoisture}%). Pause watering to prevent root rot.`);
+    }
   }
 
-  if (light < 40) {
-    recommendations.push(`Increase sunlight exposure. Current light intensity is ${light}%.`);
-  } else if (light > 90) {
-    recommendations.push(`Light intensity is high (${light}%). Consider partial shade during midday.`);
+  if (!lightFault) {
+    if (light < 40) {
+      recommendations.push(`Increase sunlight exposure. Current light intensity is ${light}%.`);
+    } else if (light > 90) {
+      recommendations.push(`Light intensity is high (${light}%). Consider partial shade during midday.`);
+    }
   }
 
-  if (temperature > 30) {
-    recommendations.push(`High ambient temperature (${formatTemp(temperature, tempUnit)}). Ensure good airflow and mist foliage.`);
-  } else if (temperature < 15) {
-    recommendations.push(`Low ambient temperature (${formatTemp(temperature, tempUnit)}). Move bonsai away from cold drafts.`);
+  if (!dhtFault) {
+    if (temperature > 30) {
+      recommendations.push(`High ambient temperature (${formatTemp(temperature, tempUnit)}). Ensure good airflow and mist foliage.`);
+    } else if (temperature < 15) {
+      recommendations.push(`Low ambient temperature (${formatTemp(temperature, tempUnit)}). Move bonsai away from cold drafts.`);
+    }
+
+    if (humidity < 40) {
+      recommendations.push(`Air humidity is dry (${humidity}%). Consider misting leaves or using a humidity tray.`);
+    }
   }
 
-  if (humidity < 40) {
-    recommendations.push(`Air humidity is dry (${humidity}%). Consider misting leaves or using a humidity tray.`);
-  }
+  if (soilFault) recommendations.push('Soil moisture sensor is not responding — check its wiring/connection.');
+  if (dhtFault) recommendations.push('Temperature/humidity (DHT22) sensor is not responding — check its wiring/connection.');
+  if (lightFault) recommendations.push('Light sensor is not responding — check its wiring/connection.');
 
   if (recommendations.length === 0) {
     recommendations.push('Plant environment is optimal. All sensors report excellent growing conditions!');

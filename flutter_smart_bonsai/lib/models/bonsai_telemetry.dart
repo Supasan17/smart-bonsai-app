@@ -1,3 +1,6 @@
+// Matches the fields the ESP32 actually writes to bonsai/telemetry
+// (see esp32_firmware/SmartBonsai_ESP32/SmartBonsai_ESP32.ino, the
+// json.set(...) calls) — same shape the website reads.
 class BonsaiTelemetry {
   final double temperature;
   final double humidity;
@@ -5,9 +8,13 @@ class BonsaiTelemetry {
   final double light;
   final bool pump;
   final bool autoMode;
-  final int plantHealth;
-  final String lastWatered;
-  final String lastUpdated;
+  final int rssi;
+  final int batteryLevel;
+  final bool soilFault;
+  final bool lightFault;
+  final bool dhtFault;
+  final bool deviceConnected;
+  final DateTime lastUpdated;
 
   BonsaiTelemetry({
     required this.temperature,
@@ -16,60 +23,84 @@ class BonsaiTelemetry {
     required this.light,
     required this.pump,
     required this.autoMode,
-    required this.plantHealth,
-    required this.lastWatered,
+    required this.rssi,
+    required this.batteryLevel,
+    required this.soilFault,
+    required this.lightFault,
+    required this.dhtFault,
+    required this.deviceConnected,
     required this.lastUpdated,
   });
 
-  factory BonsaiTelemetry.fromMap(Map<String, dynamic> map) {
+  factory BonsaiTelemetry.initial() => BonsaiTelemetry(
+        temperature: 0,
+        humidity: 0,
+        soilMoisture: 0,
+        light: 0,
+        pump: false,
+        autoMode: false,
+        rssi: 0,
+        batteryLevel: 0,
+        soilFault: false,
+        lightFault: false,
+        dhtFault: false,
+        deviceConnected: false,
+        lastUpdated: DateTime.fromMillisecondsSinceEpoch(0),
+      );
+
+  factory BonsaiTelemetry.fromMap(
+    Map<String, dynamic> map, {
+    required BonsaiTelemetry previous,
+  }) {
+    double asDouble(dynamic v, double fallback) {
+      if (v == null) return fallback;
+      if (v is num) return v.toDouble();
+      return double.tryParse(v.toString()) ?? fallback;
+    }
+
+    int asInt(dynamic v, int fallback) {
+      if (v == null) return fallback;
+      if (v is num) return v.toInt();
+      return int.tryParse(v.toString()) ?? fallback;
+    }
+
     return BonsaiTelemetry(
-      temperature: (map['temperature'] ?? 24.0).toDouble(),
-      humidity: (map['humidity'] ?? 60.0).toDouble(),
-      soilMoisture: (map['soilMoisture'] ?? 45.0).toDouble(),
-      light: (map['light'] ?? 70.0).toDouble(),
-      pump: map['pump'] ?? false,
-      autoMode: map['autoMode'] ?? false,
-      plantHealth: map['plantHealth'] ?? 90,
-      lastWatered: map['lastWatered'] ?? 'Today, 08:30 AM',
-      lastUpdated: map['lastUpdated'] ?? DateTime.now().toIso8601String(),
+      temperature: asDouble(map['temperature'], previous.temperature),
+      humidity: asDouble(map['humidity'], previous.humidity),
+      soilMoisture: asDouble(map['soilMoisture'], previous.soilMoisture),
+      light: asDouble(map['light'], previous.light),
+      pump: map['pump'] is bool ? map['pump'] as bool : previous.pump,
+      autoMode:
+          map['autoMode'] is bool ? map['autoMode'] as bool : previous.autoMode,
+      rssi: asInt(map['rssi'], previous.rssi),
+      batteryLevel: asInt(map['batteryLevel'], previous.batteryLevel),
+      soilFault: map['soilFault'] == true,
+      lightFault: map['lightFault'] == true,
+      dhtFault: map['dhtFault'] == true,
+      deviceConnected: true,
+      lastUpdated: DateTime.now(),
     );
   }
 
-  Map<String, dynamic> toMap() {
-    return {
-      'temperature': temperature,
-      'humidity': humidity,
-      'soilMoisture': soilMoisture,
-      'light': light,
-      'pump': pump,
-      'autoMode': autoMode,
-      'plantHealth': plantHealth,
-      'lastWatered': lastWatered,
-      'lastUpdated': lastUpdated,
-    };
-  }
-
   BonsaiTelemetry copyWith({
-    double? temperature,
-    double? humidity,
-    double? soilMoisture,
-    double? light,
     bool? pump,
     bool? autoMode,
-    int? plantHealth,
-    String? lastWatered,
-    String? lastUpdated,
+    bool? deviceConnected,
   }) {
     return BonsaiTelemetry(
-      temperature: temperature ?? this.temperature,
-      humidity: humidity ?? this.humidity,
-      soilMoisture: soilMoisture ?? this.soilMoisture,
-      light: light ?? this.light,
+      temperature: temperature,
+      humidity: humidity,
+      soilMoisture: soilMoisture,
+      light: light,
       pump: pump ?? this.pump,
       autoMode: autoMode ?? this.autoMode,
-      plantHealth: plantHealth ?? this.plantHealth,
-      lastWatered: lastWatered ?? this.lastWatered,
-      lastUpdated: lastUpdated ?? this.lastUpdated,
+      rssi: rssi,
+      batteryLevel: batteryLevel,
+      soilFault: soilFault,
+      lightFault: lightFault,
+      dhtFault: dhtFault,
+      deviceConnected: deviceConnected ?? this.deviceConnected,
+      lastUpdated: lastUpdated,
     );
   }
 }

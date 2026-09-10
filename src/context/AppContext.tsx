@@ -10,7 +10,7 @@ import {
 } from '../types';
 import { calculatePlantHealth } from '../services/healthCalculator';
 import { translate, LanguageCode } from '../i18n/translations';
-import { ensureSignedIn, subscribeTelemetry, sendControlCommand } from '../services/firebase';
+import { ensureSignedIn, subscribeTelemetry, sendControlCommand, subscribeProfile, saveProfile } from '../services/firebase';
 
 interface AppContextType {
   telemetry: BonsaiTelemetry;
@@ -57,7 +57,6 @@ const initialSettings: AppSettings = {
   criticalAlerts: true,
   firebaseUrl: 'https://smart-bonsai-iot-c7662-default-rtdb.asia-southeast1.firebasedatabase.app/bonsai',
   syncIntervalSec: 1,
-
   simulatedMode: false,
 };
 
@@ -193,6 +192,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               soilMoisture: Number(data.soilMoisture ?? prev.soilMoisture),
               light: Number(data.light ?? prev.light),
               pump: Boolean(data.pump ?? prev.pump),
+              autoMode: Boolean(data.autoMode ?? prev.autoMode),
               rssi: Number(data.rssi ?? prev.rssi),
               batteryLevel: Number(data.batteryLevel ?? prev.batteryLevel),
               soilFault: Boolean(data.soilFault ?? false),
@@ -203,7 +203,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             }));
           },
           () => {
-
             setTelemetry((prev) => ({ ...prev, deviceConnected: false }));
           }
         );
@@ -233,12 +232,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   useEffect(() => {
     if (settings.simulatedMode) return;
+
+    let unsubscribe: (() => void) | undefined;
+    let cancelled = false;
+
+    ensureSignedIn()
+      .then(() => {
+        if (cancelled) return;
+        unsubscribe = subscribeProfile(
+          (data) => {
+            setUser((prev) => ({
+              ...(prev ?? initialUser),
+              name: data.name ?? prev?.name ?? initialUser.name,
+              email: data.email ?? prev?.email ?? initialUser.email,
+              photoUrl: data.photoUrl ?? prev?.photoUrl ?? initialUser.photoUrl,
+              plantName: data.plantName ?? prev?.plantName ?? initialUser.plantName,
+              plantSpecies: data.plantSpecies ?? prev?.plantSpecies ?? initialUser.plantSpecies,
+              plantAgeYears: data.plantAgeYears ?? prev?.plantAgeYears ?? initialUser.plantAgeYears,
+              connectedDevice: data.connectedDevice ?? prev?.connectedDevice ?? initialUser.connectedDevice,
+              phone: data.phone ?? prev?.phone,
+              location: data.location ?? prev?.location,
+            }));
+          },
+          (err) => console.error('Failed to subscribe to profile:', err)
+        );
+      })
+      .catch((err) => console.error('Firebase sign-in failed (profile sync):', err));
+
+    return () => {
+      cancelled = true;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [settings.simulatedMode]);
+
+  useEffect(() => {
+    if (settings.simulatedMode) return;
     sendControlCommand({
-      autoMode: telemetry.autoMode,
       autoWaterMinMoisture: settings.autoWaterMinMoisture,
       autoWaterTargetMoisture: settings.autoWaterTargetMoisture,
-    }).catch((err) => console.error('Failed to sync auto-watering settings:', err));
-  }, [settings.simulatedMode, telemetry.autoMode, settings.autoWaterMinMoisture, settings.autoWaterTargetMoisture]);
+    }).catch((err) => console.error('Failed to sync thresholds:', err));
+  }, [settings.simulatedMode, settings.autoWaterMinMoisture, settings.autoWaterTargetMoisture]);
 
   useEffect(() => {
     if (!settings.simulatedMode) return;
@@ -260,7 +293,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             triggerNotification('Pump Auto Stopped', `Target soil moisture (${settings.autoWaterTargetMoisture}%) reached.`, 'success');
           }
         } else {
-
           newMoisture = Math.max(10, newMoisture - 0.04);
 
           newTemp = Number((prev.temperature + (Math.random() * 0.2 - 0.1)).toFixed(1));
@@ -322,10 +354,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const togglePump = (state?: boolean) => {
     setTelemetry((prev) => {
-      if (prev.autoMode) {
-        triggerNotification('Manual Control Blocked', 'Turn off Auto Mode to control the pump manually.', 'warning');
-        return prev;
-      }
       const nextState = state !== undefined ? state : !prev.pump;
       if (nextState) {
         setPumpActiveSeconds(0);
@@ -334,7 +362,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         triggerNotification('Water Pump Stopped', `Pump stopped after ${pumpActiveSeconds}s.`, 'success');
       }
       if (!settings.simulatedMode) {
-
         sendControlCommand({ pump: nextState }).catch((err) =>
           console.error('Failed to send pump command:', err)
         );
@@ -351,6 +378,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setTelemetry((prev) => {
       const nextState = state !== undefined ? state : !prev.autoMode;
       triggerNotification('Auto Mode Changed', `Automatic watering is now ${nextState ? 'ENABLED' : 'DISABLED'}.`, 'info');
+      if (!settings.simulatedMode) {
+        sendControlCommand({ autoMode: nextState }).catch((err) =>
+          console.error('Failed to send auto mode command:', err)
+        );
+      }
       return { ...prev, autoMode: nextState };
     });
   };
@@ -406,16 +438,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const login = (email: string) => {
-    setUser({
+    const nextUser: UserProfile = {
       ...initialUser,
       email,
       name: email.split('@')[0].toUpperCase() || 'Bonsai Master'
-    });
+    };
+    setUser(nextUser);
     setIsAuthModalOpen(false);
+    if (!settings.simulatedMode) {
+      saveProfile(nextUser).catch((err) => console.error('Failed to save profile:', err));
+    }
   };
 
   const register = (data: { email: string; name?: string; phone?: string; location?: string; plantName?: string; plantSpecies?: string }) => {
-    setUser({
+    const nextUser: UserProfile = {
       ...initialUser,
       email: data.email,
       name: data.name?.trim() || data.email.split('@')[0].toUpperCase() || 'Bonsai Master',
@@ -423,12 +459,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       location: data.location?.trim() || undefined,
       plantName: data.plantName?.trim() || initialUser.plantName,
       plantSpecies: data.plantSpecies?.trim() || initialUser.plantSpecies,
-    });
+    };
+    setUser(nextUser);
     setIsAuthModalOpen(false);
+    if (!settings.simulatedMode) {
+      saveProfile(nextUser).catch((err) => console.error('Failed to save profile:', err));
+    }
   };
 
   const updateProfile = (updates: Partial<UserProfile>) => {
-    setUser((prev) => (prev ? { ...prev, ...updates } : prev));
+    setUser((prev) => {
+      const nextUser = prev ? { ...prev, ...updates } : prev;
+      if (nextUser && !settings.simulatedMode) {
+        saveProfile(updates).catch((err) => console.error('Failed to save profile:', err));
+      }
+      return nextUser;
+    });
   };
 
   const logout = () => {
