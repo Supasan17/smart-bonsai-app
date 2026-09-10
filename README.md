@@ -31,7 +31,7 @@ In the app's **Settings** tab, toggle **Data Source** between:
 - **Live Data** — reads real sensor data from your ESP32 via Firebase
 - **Demo Data** — simulated sample data, no hardware required
 
-## Build 1
+## Build 
 
 ```bash
 npm run build
